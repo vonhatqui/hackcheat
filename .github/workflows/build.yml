@@ -1,4 +1,4 @@
-name: Build-Savage-Blue-2026-V4
+name: Build-Savage-Blue-2026
 on: [push, workflow_dispatch]
 
 jobs:
@@ -8,38 +8,25 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Theos & SDK (CLONE MODE)
+      - name: Install Build Tools
+        run: brew install ldid dpkg
+
+      - name: Install Theos & SDK
         run: |
           export THEOS=~/theos
-          # Clone bộ khung Theos
           git clone --recursive https://github.com/theos/theos.git $THEOS
-          
-          # FIX LỖI TAR: Không tải nén nữa, Clone thẳng từ Repo SDK
-          # Em chọn bản SDK 14.5 vì nó nhẹ và ổn định nhất cho bypass FF
           mkdir -p $THEOS/sdks
           git clone --depth 1 https://github.com/theos/sdks.git $THEOS/sdks-tmp
-          
-          # Di chuyển SDK vào đúng vị trí và dọn dẹp
           mv $THEOS/sdks-tmp/iPhoneOS14.5.sdk $THEOS/sdks/
           rm -rf $THEOS/sdks-tmp
-          
-          # Kiểm tra xem SDK đã nằm đúng chỗ chưa
-          if [ -d "$THEOS/sdks/iPhoneOS14.5.sdk" ]; then
-            echo "SDK ĐÃ SẴN SÀNG CHO ĐẠI CA!"
-          else
-            echo "Vẫn lỗi? Để em cưỡng ép tải bản 13.0..."
-            curl -L https://github.com/theos/sdks/raw/master/iPhoneOS13.0.sdk.tar.xz -o $THEOS/sdks/sdk.tar.xz
-            tar -xJf $THEOS/sdks/sdk.tar.xz -C $THEOS/sdks/
-          fi
 
       - name: Build Dylib
         run: |
           export THEOS=~/theos
-          # Chỉ định rõ SDK cho compiler để tránh nó lấy SDK mặc định của MacOS
           make package FINALPACKAGE=1 SDKVERSION=14.5
-          
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Savage-Blue-2026-Final
+          name: Savage-Blue-Final
           path: packages/*.deb
