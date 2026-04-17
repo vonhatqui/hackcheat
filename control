@@ -1,0 +1,9 @@
+Package: com.savage.blue2026
+Name: SavageBlue2026
+Depends: mobilesubstrate
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: Đẳng cấp hack Free Fire cho Đại ca 2026
+Maintainer: SavageDev
+Author: SavageDev
+Section: Tweaks
