@@ -1,5 +1,6 @@
 # THIẾT LẬP BUILD TỐI ƯU CHO ĐẠI CA
 ARCHS = arm64 arm64e
+SYSROOT = $(THEOS)/sdks/iPhoneOS14.5.sdk
 TARGET = iphone:clang:latest:15.0
 DEBUG = 0
 FINALPACKAGE = 1
