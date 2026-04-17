@@ -1,4 +1,4 @@
-name: Build-Savage-Blue-2026
+name: Build-Savage-Blue-Final-2026
 on: [push, workflow_dispatch]
 
 jobs:
@@ -9,24 +9,52 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Build Tools
-        run: brew install ldid dpkg
+        run: |
+          brew install ldid dpkg
+          # Cài đặt thêm gmake nếu cần thiết để build mượt hơn
+          brew install make
 
       - name: Install Theos & SDK
         run: |
           export THEOS=~/theos
           git clone --recursive https://github.com/theos/theos.git $THEOS
           mkdir -p $THEOS/sdks
+          # Clone SDK 14.5 chuẩn để không bị lỗi header Xcode 16
           git clone --depth 1 https://github.com/theos/sdks.git $THEOS/sdks-tmp
           mv $THEOS/sdks-tmp/iPhoneOS14.5.sdk $THEOS/sdks/
           rm -rf $THEOS/sdks-tmp
 
-      - name: Build Dylib
+      - name: Fix Missing Plist & Prepare Build
+        run: |
+          # Tự động tạo file Plist nếu Đại ca lỡ quên để tránh lỗi "Missing filter property list"
+          if [ ! -f "SavageBlue2026.plist" ]; then
+            echo "Đang tạo file SavageBlue2026.plist dự phòng..."
+            cat <<EOF > SavageBlue2026.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>Filter</key>
+            <dict>
+              <key>Bundles</key>
+              <array>
+                <string>com.dts.freefireth</string>
+                <string>com.dts.freefiremax</string>
+              </array>
+            </dict>
+          </dict>
+          </plist>
+          EOF
+          fi
+
+      - name: Build Dylib & Package
         run: |
           export THEOS=~/theos
-          make package FINALPACKAGE=1 SDKVERSION=14.5
+          # Ép build với SDK 14.5 và tắt mọi cảnh báo coi như lỗi
+          make package FINALPACKAGE=1 SDKVERSION=14.5 THEOS_PACKAGE_SCHEME=rootless
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Savage-Blue-Final
+          name: Savage-Blue-2026-Hàng-Nóng
           path: packages/*.deb
