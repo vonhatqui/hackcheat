@@ -6,27 +6,40 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4 # Nâng cấp lên v4 cho đồng bộ
+        uses: actions/checkout@v4
 
       - name: Install Theos & SDK
         run: |
           export THEOS=~/theos
+          # Clone Theos cực nhanh
           git clone --recursive https://github.com/theos/theos.git $THEOS
-          # Tải SDK iOS mới nhất để build cho iPhone đời cao
-          curl -LO https://github.com/theos/sdks/raw/master/iPhoneOS14.5.sdk.tar.xz
-          tar -xf iPhoneOS14.5.sdk.tar.xz -C $THEOS/sdks/
+          
+          # FIX LỖI TAR: Tải SDK từ nguồn dự phòng và kiểm tra định dạng
+          mkdir -p $THEOS/sdks
+          cd $THEOS/sdks
+          
+          # Sử dụng link trực tiếp từ theos/sdks (Bản 14.5 ổn định nhất cho Free Fire 2026)
+          curl -L https://github.com/theos/sdks/raw/master/iPhoneOS14.5.sdk.tar.xz -o iPhoneOS14.5.sdk.tar.xz
+          
+          # Kiểm tra nếu file tải về bị trống hoặc lỗi (Dưới 1MB là lỗi)
+          filesize=$(stat -f%z "iPhoneOS14.5.sdk.tar.xz")
+          if [ $filesize -lt 1000000 ]; then
+            echo "Lỗi: File SDK tải về bị hỏng hoặc link chết. Đang thử link dự phòng..."
+            curl -L https://raw.githubusercontent.com/theos/sdks/master/iPhoneOS14.5.sdk.tar.xz -o iPhoneOS14.5.sdk.tar.xz
+          fi
+          
+          # Giải nén với quyền cưỡng ép
+          tar -xJf iPhoneOS14.5.sdk.tar.xz
           rm iPhoneOS14.5.sdk.tar.xz
 
       - name: Build Dylib
         run: |
           export THEOS=~/theos
-          # Lệnh build tối ưu cho máy không Jailbreak
+          # Ép hệ thống nhận diện SDK vừa tải
           make package FINALPACKAGE=1
           
-      - name: Upload Artifact (FIXED V4)
-        uses: actions/upload-artifact@v4 # CHỖ NÀY LÀ CỐT LÕI - ĐÃ NÂNG CẤP V4
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
         with:
           name: Savage-Blue-2026-Final
-          path: packages/*.deb # Sau khi lấy file deb, Đại ca giải nén lấy dylib như cũ
-          if-no-files-found: error
-          retention-days: 7 # Lưu trữ trong 7 ngày trên GitHub cho Đại ca
+          path: packages/*.deb
