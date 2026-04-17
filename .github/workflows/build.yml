@@ -8,35 +8,35 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Theos & SDK
+      - name: Install Theos & SDK (CLONE MODE)
         run: |
           export THEOS=~/theos
-          # Clone Theos cực nhanh
+          # Clone bộ khung Theos
           git clone --recursive https://github.com/theos/theos.git $THEOS
           
-          # FIX LỖI TAR: Tải SDK từ nguồn dự phòng và kiểm tra định dạng
+          # FIX LỖI TAR: Không tải nén nữa, Clone thẳng từ Repo SDK
+          # Em chọn bản SDK 14.5 vì nó nhẹ và ổn định nhất cho bypass FF
           mkdir -p $THEOS/sdks
-          cd $THEOS/sdks
+          git clone --depth 1 https://github.com/theos/sdks.git $THEOS/sdks-tmp
           
-          # Sử dụng link trực tiếp từ theos/sdks (Bản 14.5 ổn định nhất cho Free Fire 2026)
-          curl -L https://github.com/theos/sdks/raw/master/iPhoneOS14.5.sdk.tar.xz -o iPhoneOS14.5.sdk.tar.xz
+          # Di chuyển SDK vào đúng vị trí và dọn dẹp
+          mv $THEOS/sdks-tmp/iPhoneOS14.5.sdk $THEOS/sdks/
+          rm -rf $THEOS/sdks-tmp
           
-          # Kiểm tra nếu file tải về bị trống hoặc lỗi (Dưới 1MB là lỗi)
-          filesize=$(stat -f%z "iPhoneOS14.5.sdk.tar.xz")
-          if [ $filesize -lt 1000000 ]; then
-            echo "Lỗi: File SDK tải về bị hỏng hoặc link chết. Đang thử link dự phòng..."
-            curl -L https://raw.githubusercontent.com/theos/sdks/master/iPhoneOS14.5.sdk.tar.xz -o iPhoneOS14.5.sdk.tar.xz
+          # Kiểm tra xem SDK đã nằm đúng chỗ chưa
+          if [ -d "$THEOS/sdks/iPhoneOS14.5.sdk" ]; then
+            echo "SDK ĐÃ SẴN SÀNG CHO ĐẠI CA!"
+          else
+            echo "Vẫn lỗi? Để em cưỡng ép tải bản 13.0..."
+            curl -L https://github.com/theos/sdks/raw/master/iPhoneOS13.0.sdk.tar.xz -o $THEOS/sdks/sdk.tar.xz
+            tar -xJf $THEOS/sdks/sdk.tar.xz -C $THEOS/sdks/
           fi
-          
-          # Giải nén với quyền cưỡng ép
-          tar -xJf iPhoneOS14.5.sdk.tar.xz
-          rm iPhoneOS14.5.sdk.tar.xz
 
       - name: Build Dylib
         run: |
           export THEOS=~/theos
-          # Ép hệ thống nhận diện SDK vừa tải
-          make package FINALPACKAGE=1
+          # Chỉ định rõ SDK cho compiler để tránh nó lấy SDK mặc định của MacOS
+          make package FINALPACKAGE=1 SDKVERSION=14.5
           
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
