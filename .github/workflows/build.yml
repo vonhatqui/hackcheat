@@ -1,4 +1,4 @@
-name: Build-Savage-Dylib-2026
+name: Build-Savage-Blue-2026-V4
 on: [push, workflow_dispatch]
 
 jobs:
@@ -6,23 +6,27 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # Nâng cấp lên v4 cho đồng bộ
 
       - name: Install Theos & SDK
         run: |
           export THEOS=~/theos
           git clone --recursive https://github.com/theos/theos.git $THEOS
+          # Tải SDK iOS mới nhất để build cho iPhone đời cao
           curl -LO https://github.com/theos/sdks/raw/master/iPhoneOS14.5.sdk.tar.xz
           tar -xf iPhoneOS14.5.sdk.tar.xz -C $THEOS/sdks/
           rm iPhoneOS14.5.sdk.tar.xz
 
-      - name: Build Package
+      - name: Build Dylib
         run: |
           export THEOS=~/theos
+          # Lệnh build tối ưu cho máy không Jailbreak
           make package FINALPACKAGE=1
           
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+      - name: Upload Artifact (FIXED V4)
+        uses: actions/upload-artifact@v4 # CHỖ NÀY LÀ CỐT LÕI - ĐÃ NÂNG CẤP V4
         with:
-          name: Savage-FreeFire-2026
-          path: packages/*.deb
+          name: Savage-Blue-2026-Final
+          path: packages/*.deb # Sau khi lấy file deb, Đại ca giải nén lấy dylib như cũ
+          if-no-files-found: error
+          retention-days: 7 # Lưu trữ trong 7 ngày trên GitHub cho Đại ca
