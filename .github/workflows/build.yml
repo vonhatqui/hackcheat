@@ -1,0 +1,28 @@
+name: Build-Savage-Dylib-2026
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Install Theos & SDK
+        run: |
+          export THEOS=~/theos
+          git clone --recursive https://github.com/theos/theos.git $THEOS
+          curl -LO https://github.com/theos/sdks/raw/master/iPhoneOS14.5.sdk.tar.xz
+          tar -xf iPhoneOS14.5.sdk.tar.xz -C $THEOS/sdks/
+          rm iPhoneOS14.5.sdk.tar.xz
+
+      - name: Build Package
+        run: |
+          export THEOS=~/theos
+          make package FINALPACKAGE=1
+          
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Savage-FreeFire-2026
+          path: packages/*.deb
