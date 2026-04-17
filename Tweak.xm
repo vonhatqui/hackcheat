@@ -1,76 +1,91 @@
-#import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <substrate.h>
+#import <mach-o/dyld.h>
 
-// --- BIẾN TOÀN CỤC (Lưu trạng thái hack) ---
-static bool isAimOn = false;
-static bool isEspOn = false;
-static float fovVal = 180.0f;
+// BIẾN ĐIỀU KHIỂN
+static bool isFovOn = false;
+static float fovVal = 150.0f;
 
-// --- HOOK VÀO HỆ THỐNG ĐỂ ĐIỀU KHIỂN ---
+// --- LỚP VẼ VÒNG FOV CHUYÊN NGHIỆP ---
+@interface SavageGFX : UIView
+@end
+@implementation SavageGFX
+- (void)drawRect:(CGRect)rect {
+    if (isFovOn) {
+        CGContextRef ctx = UIGraphicsGetCurrentContext();
+        CGContextSetLineWidth(ctx, 1.5);
+        CGContextSetStrokeColorWithColor(ctx, [UIColor cyanColor].CGColor);
+        // Vẽ vòng nét đứt nhìn cho "nguy hiểm"
+        CGFloat lengths[] = {5, 5};
+        CGContextSetLineDash(ctx, 0, lengths, 2);
+        CGRect c = CGRectMake(self.center.x - fovVal, self.center.y - fovVal, fovVal*2, fovVal*2);
+        CGContextAddEllipseInRect(ctx, c);
+        CGContextStrokePath(ctx);
+    }
+}
+@end
 
-// Đánh chặn nút gạt trên Dashboard
+static SavageGFX *overlay;
+
+// --- HỆ THỐNG ANTIBAN (MỚI) ---
+// Hook để giấu file dylib khi game quét thư mục cài đặt
+static BOOL (*old_fileExistsAtPath)(NSFileManager* self, SEL _cmd, NSString* path);
+BOOL new_fileExistsAtPath(NSFileManager* self, SEL _cmd, NSString* path) {
+    if ([path containsString:@"SavageBlue"] || [path containsString:@".dylib"]) {
+        return NO; // Trả về "Không tìm thấy" để bypass bảo vệ
+    }
+    return old_fileExistsAtPath(self, _cmd, path);
+}
+
 %hook UISwitch
 - (void)setOn:(BOOL)on animated:(BOOL)animated {
     %orig;
-    if (self.tag == 101) {
-        isAimOn = on;
-        NSLog(@"[Savage] Aimbot Active: %d", on);
-    }
-    if (self.tag == 201) {
-        isEspOn = on;
-        NSLog(@"[Savage] ESP Active: %d", on);
+    if (self.tag == 301) {
+        isFovOn = on;
+        [overlay setNeedsDisplay];
     }
 }
 %end
 
-// Đánh chặn thanh kéo FOV
 %hook UISlider
 - (void)setValue:(float)value animated:(BOOL)animated {
     %orig;
     if (self.tag == 999) {
         fovVal = value;
+        [overlay setNeedsDisplay];
     }
 }
 %end
 
-// --- CƠ CHẾ CƯỠNG CHẾ HIỆN MENU ---
-void ShowSavageMenu() {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        UIWindow *window = nil;
-        if (@available(iOS 13.0, *)) {
-            for (UIWindowScene* scene in [UIApplication sharedApplication].connectedScenes) {
-                if (scene.activationState == UISceneActivationStateForegroundActive) {
-                    window = scene.windows.firstObject;
-                    break;
+// --- KHỞI TẠO VÀ QUÉT ĐỊA CHỈ (SCAN OFFSET) ---
+%ctor {
+    // Chặn game quét file dylib ngay khi khởi tạo
+    MSHookMessageEx([NSFileManager class], @selector(fileExistsAtPath:), (IMP)new_fileExistsAtPath, (IMP*)&old_fileExistsAtPath);
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 15 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        UIWindow *win = [UIApplication sharedApplication].keyWindow;
+        if (!win && @available(iOS 13.0, *)) {
+            for (UIWindowScene* s in [UIApplication sharedApplication].connectedScenes) {
+                if (s.activationState == UISceneActivationStateForegroundActive) {
+                    win = s.windows.firstObject; break;
                 }
             }
         }
-        if (!window) window = [UIApplication sharedApplication].keyWindow;
-
-        if (window) {
-            Class menuClass = NSClassFromString(@"SavageMenu");
-            // Chỉ thêm nếu chưa tồn tại (tránh lag)
-            if (menuClass && ![window viewWithTag:9988]) {
-                UIView *menu = [[menuClass alloc] initWithFrame:window.bounds];
-                menu.tag = 9988;
-                [window addSubview:menu];
-                [window bringSubviewToFront:menu];
-                NSLog(@"[Savage] Dashboard đã nạp thành công!");
+        
+        if (win) {
+            // Nạp Menu Dashboard
+            Class mClass = NSClassFromString(@"SavageMenu");
+            if (mClass) {
+                UIView *v = [[mClass alloc] initWithFrame:win.bounds];
+                [win addSubview:v];
             }
+            // Nạp Overlay FOV
+            overlay = [[SavageGFX alloc] initWithFrame:win.bounds];
+            overlay.backgroundColor = [UIColor clearColor];
+            overlay.userInteractionEnabled = NO;
+            [win addSubview:overlay];
         }
     });
 }
 
-%ctor {
-    // Chạy lệnh hiện Menu sau 10 giây (khi đã qua logo Garena)
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-        ShowSavageMenu();
-    });
-    
-    // Quét lại lần 2 sau 20 giây để chắc chắn hiện trong sảnh
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 20 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-        ShowSavageMenu();
-    });
-}
 
