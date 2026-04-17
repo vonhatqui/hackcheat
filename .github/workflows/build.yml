@@ -10,25 +10,20 @@ jobs:
 
       - name: Install Build Tools
         run: |
-          brew install ldid dpkg
-          # Cài đặt thêm gmake nếu cần thiết để build mượt hơn
-          brew install make
+          brew install ldid dpkg make
 
       - name: Install Theos & SDK
         run: |
           export THEOS=~/theos
           git clone --recursive https://github.com/theos/theos.git $THEOS
           mkdir -p $THEOS/sdks
-          # Clone SDK 14.5 chuẩn để không bị lỗi header Xcode 16
           git clone --depth 1 https://github.com/theos/sdks.git $THEOS/sdks-tmp
           mv $THEOS/sdks-tmp/iPhoneOS14.5.sdk $THEOS/sdks/
           rm -rf $THEOS/sdks-tmp
 
       - name: Fix Missing Plist & Prepare Build
         run: |
-          # Tự động tạo file Plist nếu Đại ca lỡ quên để tránh lỗi "Missing filter property list"
           if [ ! -f "SavageBlue2026.plist" ]; then
-            echo "Đang tạo file SavageBlue2026.plist dự phòng..."
             cat <<EOF > SavageBlue2026.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -47,14 +42,19 @@ jobs:
           EOF
           fi
 
-      - name: Build Dylib & Package
+      - name: Build Dylib Only
         run: |
           export THEOS=~/theos
-          # Ép build với SDK 14.5 và tắt mọi cảnh báo coi như lỗi
-          make package FINALPACKAGE=1 SDKVERSION=14.5 THEOS_PACKAGE_SCHEME=rootless
+          # Chỉ chạy make để tạo dylib, không đóng gói thành deb
+          make FINALPACKAGE=1 SDKVERSION=14.5
+          
+          # Tạo thư mục đầu ra và gom file dylib vào
+          mkdir -p out_dylib
+          find .theos/obj/ -name "*.dylib" -exec cp {} out_dylib/ \;
 
-      - name: Upload Artifact
+      - name: Upload Dylib Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Savage-Blue-2026-Hàng-Nóng
-          path: packages/*.deb
+          name: Savage-Blue-Dylib-Hang-Nong
+          path: out_dylib/*.dylib
+
